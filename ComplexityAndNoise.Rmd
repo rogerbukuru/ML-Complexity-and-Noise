@@ -1,5 +1,5 @@
 ---
-title: "ML-ComplexityAndNoise"
+title: "Assignment I - Complexity And Noise"
 author: "Roger Bukuru"
 date: "`r Sys.Date()`"
 output: html_document
@@ -11,6 +11,71 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Question 1
 
-```{r}
+## (a)
+
+```{r, echo=FALSE}
+# Legendre polynomials
+Legendre=function(x,q){
+	val=0
+	for(i in 0:q){
+		val=val+((x^i)*choose(q,i)*choose((q+i-1)/2,q))
+	}
+	return((2^q)*val)
+}
+
+x<-seq(-1,1,0.01)
+plot(x,Legendre(x,1),type="l",ylab=expression(L[n](x)),col="blue")
+lines(x,Legendre(x,0),type="l",col="black")
+lines(x,Legendre(x,2),type="l",col="green")
+lines(x,Legendre(x,3),type="l",col="red")
+lines(x,Legendre(x,4),type="l",col="orange")
+lines(x,Legendre(x,5),type="l",col="purple")
+```
+
+The behaviour that we observe is that as we increase $q$ the complexity of the resulting function increases, it ranges from a function that is at the intercept to a 5-degree polynomial.
+
+## (b)
+
+```{r, echo=FALSE}
+set.seed(123)
+# creates random polynomial target functions
+rPolyfunc=function(x,n){ # Equation 2
+  val=0
+  vec=runif(n,-1,1)
+  for(i in 1:n){
+    val=val+(x^i*vec[i])
+  }
+  return(val)
+}
+
+rLegfunc=function(x,n){ # Equation 3
+	val=0
+	vec=runif(n,-1,1)
+	for(i in 1:n){
+		val=val+(Legendre(x,i)*vec[i])
+	}
+	return(val)
+}
+
+# Equation 2 randomly generated functions
+x<-seq(-1,1,0.01)
+plot(x,1.5*x,type="n",ylab=expression(f(x)), main= "Equation 2 random target functions")
+lines(x,rPolyfunc(x,2),type="l")
+lines(x,rPolyfunc(x,3),col="blue")
+lines(x,rPolyfunc(x,4),col="red")
+#lines(x,rPolyfunc(x,5),col="green")
 
 ```
+
+
+```{r, echo=FALSE}
+# Equation 3 randomly generated functions
+set.seed(123)
+x<-seq(-1,1,0.01)
+plot(x,1.1*x,type="n",ylab=expression(f(x)), main= "Equation 3 random target functions")
+lines(x,rLegfunc(x,2),type="l")
+lines(x,rLegfunc(x,3),col="blue")
+lines(x,rLegfunc(x,4),col="red")
+```
+
+Reviewing the above two figures, we observe that for the target functions generated from equation 2, they have fewer degrees of freedom compared to the target functions generated from equation 3. As a result, they depict target functions with less model complexity compared to those from equation 3. The target functions from equation 3 are also smoother and can in theory better capture non-linear relationships, however if we push the $q$ value we may end up with more complex functions similar to those from question 1.

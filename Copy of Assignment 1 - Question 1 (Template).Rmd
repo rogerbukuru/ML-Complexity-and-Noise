@@ -1,0 +1,51 @@
+---
+title: "STA5068S 2023 Exam (Question 1)"
+author: "YOUR NAME HERE PLEASE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+date: "2023-11-15"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# Set up options for the entire document
+knitr::opts_chunk$set(echo = TRUE,fig.align = 'center', fig.width = 7, fig.height = 7)
+```
+
+## Question 1
+
+### 1 (a) 
+
+
+```{r}
+rm(list = ls())
+
+f = function(x)
+{
+  return((abs(x-1)*(x>=0)+abs(x+1)*(x<0)-0.5))
+}
+
+xx = seq(-2,2,1/100)
+```
+
+### 1 (b) 
+
+
+### 1 (c) 
+
+
+```{r}
+bvar = function(M = 1000, N = 2,sigma, dlt = 1/100,low=-2,up=2)
+{
+
+  return(list(bias = bias, variance = variance, Eout = 0, Eout2 = 0))
+}
+
+```
+
+### 1 (d)
+
+```{r}
+
+```
+
+### 1 (e)
+

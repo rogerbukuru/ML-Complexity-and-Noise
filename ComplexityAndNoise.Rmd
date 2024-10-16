@@ -3,6 +3,7 @@ title: "Assignment I - Complexity And Noise"
 author: "Roger Bukuru"
 date: "`r Sys.Date()`"
 output: html_document
+always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}
@@ -13,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## (a)
 
-```{r, echo=FALSE}
+```{r}
 # Legendre polynomials
 Legendre=function(x,q){
 	val=0
@@ -36,7 +37,7 @@ The behaviour that we observe is that as we increase $q$ the complexity of the r
 
 ## (b)
 
-```{r, echo=FALSE}
+```{r}
 set.seed(123)
 # creates random polynomial target functions
 rPolyfunc=function(x,n){ # Equation 2
@@ -68,7 +69,7 @@ lines(x,rPolyfunc(x,4),col="red")
 ```
 
 
-```{r, echo=FALSE}
+```{r}
 # Equation 3 randomly generated functions
 set.seed(123)
 x<-seq(-1,1,0.01)
@@ -79,3 +80,216 @@ lines(x,rLegfunc(x,4),col="red")
 ```
 
 Reviewing the above two figures, we observe that for the target functions generated from equation 2, they have fewer degrees of freedom compared to the target functions generated from equation 3. As a result, they depict target functions with less model complexity compared to those from equation 3. The target functions from equation 3 are also smoother and can in theory better capture non-linear relationships, however if we push the $q$ value we may end up with more complex functions similar to those from question 1.
+
+
+# Question 3
+
+## (a)
+
+```{r}
+
+rm(list=ls())
+
+set.seed(2023)
+# Set up a target function/pattern:
+f = function(x) {
+  ifelse(x < rep(0, length(x)),  (abs(x + 1) - 0.5), (abs(x - 1) - 0.5))
+}
+
+
+# Data Generating Process
+dgp = function(N, f, sig2=0)
+{
+   x = runif(N,-2,2)
+   e = rnorm(N,0,sqrt(sig2))
+   y = f(x) + e
+   return(list(y = y, x = x))
+}
+
+
+# Hypothesis models
+h1 = function(x, w0, w1) {
+  w0 + w1 * x
+}
+
+h2 = function(x, w1, w2) {
+  w1 * sin(pi * x) + w2 * cos(pi * x)
+}
+
+# Plot f(x) over the input space
+x_vals = seq(-2, 2, length.out = 100)
+plot(x_vals, f(x_vals), type = "l", col = "black", ylim = c(-2, 2), lwd = 2,
+     main = "Target Function f(x) and Hypothesis Models", xlab = "x", ylab = "y")
+
+for( i in 1:5){
+  sample_data = dgp(5, f)
+  h1_fit      = lm(y~x, data=sample_data)
+  h1_pred     = predict(h1_fit, newdata = data.frame(x = x_vals))
+  
+  sample_data$z1 = sin(pi * sample_data$x)
+  sample_data$z2 = cos(pi * sample_data$x)
+  h2_fit = lm(y ~ z1 + z2 - 1, data = sample_data)
+  h2_pred = predict(h2_fit, newdata = data.frame(z1 = sin(pi * x_vals), z2 = cos(pi * x_vals)))
+  # Plot the fitted models
+  lines(x_vals, h1_pred, col = "blue", lty = 2)  # h1 hypothesis
+  lines(x_vals, h2_pred, col = "red", lty = 3) # h2 hypothesis
+    
+  # Add points for each sample
+  points(sample_data$x, sample_data$y, col = "orange", pch = 19)
+} 
+
+legend("topright", legend = c("Target Function f(x)", "Hypothesis h1", "Hypothesis h2", "Sample Points"),
+       col = c("black", "blue", "red", "orange"), lty = c(1, 2, 3, NA), pch = c(NA, NA, NA, 19), 
+       bty = "n", cex = 0.8)
+ 
+  
+```
+
+
+# (b)
+
+Based on the plots in (a) what we observe is that hypothesis $h2$ results in the best approximation of the target function, however this doesn't mean it will be the best suited to modelling the the given data engineering process. Therefore we apriori expect it to fail to generalize out-of-sample as it is overly fitting onto the target function. The model complexity indicates that is has low-bias however when attempting to learn i.e generalize we apriori expect it to product sub-optimal results as a result we apriori believe that model $h1$ would be the more suited to modelling the given data generating process.
+
+# (c)
+
+```{r}
+bias_var = function(N = 5, sig2 = 0, M = 1000, hypothesis = "h1", dx = 1/100)
+{
+	x_lat = seq(-2,2,dx)
+	N_dx  = length(x_lat)
+	g_bar = rep(0,N_dx)
+	G_d   = matrix(0,M,N_dx)
+	
+	errors = rep(0,M)
+	for(i in 1:M)
+	{
+		res_data = dgp(N,f,sig2)
+		g_D = NULL
+		if(hypothesis == "h1"){
+		   res_model = lm(y~x, data=res_data)
+		   g_D       = predict(res_model,data.frame(x = x_lat))
+		   g_bar     = g_bar + g_D # Calculating the sum part in the averaging
+		   G_d[i,]   = g_D # Particular realization of the data
+		   dat_OOS   = dgp(N,f,sig2)
+		   yhat_OOS  = predict(res_model,data.frame(x=dat_OOS$x))
+		   errors[i] = mean((yhat_OOS-dat_OOS$y)^2) # Mean-squared error 
+		}
+	  if(hypothesis == "h2"){
+		   res_data$z1  = sin(pi * res_data$x)
+       res_data$z2  = cos(pi * res_data$x)
+       res_model    = lm(y ~ z1 + z2 - 1, data = res_data)
+       g_D          = predict(res_model, newdata = data.frame(z1 = sin(pi * x_lat), z2 = cos(pi * x_lat)))
+       g_bar        = g_bar + g_D # Calculating the sum part in the averaging
+       G_d[i,]      = g_D
+		   dat_OOS      = dgp(N,f,sig2)
+		   dat_OOS$z1   = sin(pi * dat_OOS$x)
+       dat_OOS$z2   = cos(pi * dat_OOS$x)
+		   yhat_OOS     =  predict(res_model, newdata = data.frame(z1 = sin(pi * dat_OOS$x), z2 = cos(pi * dat_OOS$x))) 
+		   errors[i]    = mean((yhat_OOS-dat_OOS$y)^2)
+	  }
+	
+
+	}
+	g_bar = g_bar/M # Finally calculate the average
+
+	test_error = mean(errors)
+	phi_X = 1/2
+	bias2 = sum((g_bar-f(x_lat))[-N_dx]^2*phi_X*dx) # Is the -N_dx due to the left integral ?
+	
+	ones = matrix(1,M,1)
+	var_at_x = colSums((G_d-ones%*%g_bar)^2)/M # Variance at x across all data realisations
+	var      = sum(var_at_x[-N_dx]*phi_X*dx)
+	test_error_2 = bias2 + var + sig2
+	
+	return(list(bias2 = bias2,var = var, both = bias2+var, test_error = test_error, test_error_2 = test_error_2, g_bar = g_bar))	
+}
+set.seed(2023)
+
+h1_model_bias_variance = bias_var(N = 5, sig2 = 0, M = 1000, hypothesis = "h1", dx = 1/100)
+h2_model_bias_variance = bias_var(N = 5, sig2 = 0, M = 1000, hypothesis = "h2", dx = 1/100)
+
+
+
+results <- data.frame(
+  Component = c("Bias", "Variance"),
+  `H_0` = c(round(h1_model_bias_variance$bias2, 4), round(h1_model_bias_variance$var, 4)),
+  `H_1` = c(round(h2_model_bias_variance$bias2, 4), round(h2_model_bias_variance$var, 4))
+)
+
+#kable(results, format = "html", caption = "Bias and Variance for H0 and H1") %>%
+ # kable_styling(full_width = FALSE, position = "center")
+
+```
+
+\begin{table}[h!]
+\centering
+\caption{Bias and Variance for H0 and H1}
+\begin{tabular}{lcc}
+\toprule
+Component & $H_0$ & $H_1$ \\
+\midrule
+Bias     & 0.1675 & 0.0024 \\
+Variance & 0.1728 & 0.0016 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+```{r}
+set.seed(2023)
+sigma_values = c(0, 0.1, 0.2, 0.3, 0.4, 0.5)
+bias_values  = data.frame( h1 = rep(0, length(sigma_values)), h2 = rep(0, length(sigma_values)) )
+variance_values  = data.frame( h1 =rep(0, length(sigma_values)), h2= rep(0, length(sigma_values)) )
+expected_oss_1_values  = data.frame( h1 =rep(0, length(sigma_values)), h2= rep(0, length(sigma_values)) )
+expected_oss_2_values  = data.frame( h1 =rep(0, length(sigma_values)), h2= rep(0, length(sigma_values)) )
+
+
+for ( i in 1:length(sigma_values)){
+  h1_model_bias_variance = bias_var(N = 5, sig2 = sigma_values[i], M = 1000, hypothesis = "h1", dx = 1/100)
+  h2_model_bias_variance = bias_var(N = 5, sig2 = sigma_values[i], M = 1000, hypothesis = "h2", dx = 1/100)
+  
+  bias_values$h1[i] = h1_model_bias_variance$bias2
+  bias_values$h2[i] = h2_model_bias_variance$bias2
+  
+  variance_values$h1[i] = h1_model_bias_variance$var
+  variance_values$h2[i] = h2_model_bias_variance$var
+  
+  expected_oss_1_values$h1[i] = h1_model_bias_variance$test_error
+  expected_oss_1_values$h2[i] = h2_model_bias_variance$test_error
+  
+  expected_oss_2_values$h1[i] = h1_model_bias_variance$test_error_2
+  expected_oss_2_values$h2[i] = h2_model_bias_variance$test_error_2
+}
+
+
+# Plot 1
+
+plot(sigma_values, bias_values$h1, type="l", xlab= "Sigma", ylab="Bias", ylim=c(0, 0.30), main="Bias for H1 and H2", col="red", lwd=2)
+lines(sigma_values, bias_values$h2, col="orange", lwd=2)
+legend("topleft", legend = c("Hypothesis h1", "Hypothesis h2"),
+       col = c("red", "orange"), lty = c(1, 1), 
+       bty = "n", cex = 0.8)
+# Plot 2
+
+plot(sigma_values, variance_values$h1, type="l", xlab= "sigma", ylab="Variance", ylim=c(0, 1), main="Variance for H1 and H2", col="red", lwd=2)
+lines(sigma_values, variance_values$h2, col="orange", lwd=2)
+legend("topleft", legend = c("Hypothesis h1", "Hypothesis h2"),
+       col = c("red", "orange"), lty = c(1, 1), 
+       bty = "n", cex = 0.8)
+
+# Plot 3
+plot(sigma_values, expected_oss_1_values$h1, type="l", xlab= "Sigma", ylab="Expected Error", ylim=c(0, 2), main="OSS Expected Error for H1 and H2", col="red", lwd=2)
+lines(sigma_values, expected_oss_2_values$h1, col="orange", lwd=2)
+lines(sigma_values, expected_oss_1_values$h2, col="blue", lwd=2)
+lines(sigma_values, expected_oss_2_values$h2, col="purple", lwd=2)
+legend("topleft", legend = c("MSE OSS-Error H1", "BV+Noise OSS-Error H1", "MSE OSS-Error MSE H2", "BV+Noise OSS-Error H2"),
+       col = c("red", "orange", "blue", "purple"), lty = c(1, 1, 1,1), 
+       bty = "n", cex = 0.8)
+```
+
+
+The bias variance dynamics above shows that as we introduce noise into the data generating process, the bias term is not affected or at least the effect is ignorable, however the variance component is significantly effect by the noise as we observe that the variance increase with an increase in sigma. With respect to the individual models we observe that the noise component had the largest affect on the simpler H1 model, the more complex model better handles the introduction of noise as its rate of increase in variance is less erratic compared to H1. The out-of-sample dyanamics further support this as we observe that H2 has better OOS performance as the noise increases. 
+
+Finally for the given data generating process, and the given realized data set (data resources) we think that model H2 would be the most appropriate as it has the better out-of-sample performance, indicating that it generalizes better. Moreover from the results we note that it has the better out-of-sample performance for both when we have noise and in the case where we don't have noise.
+
+

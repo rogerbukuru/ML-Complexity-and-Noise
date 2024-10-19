@@ -394,7 +394,7 @@ neural_net = function(X, Y, theta,m,nu) {
    error[y_i_3]  = (Y[y_i_3,]*(log(y_hat[y_i_3,])))[,3]
    
    
-   E1 = -1/N*error
+   E1 = -1/N*sum(error)
    E2 = E1 + nu*(sum(W1^2)+sum(W2^2))/N
    # Return a list of relevant objects:
    return(list(A2 = A2,A1 = A1, E1 = E1, E2 = E2))
@@ -402,8 +402,8 @@ neural_net = function(X, Y, theta,m,nu) {
   
 }
 
-nu  = 0.1
-m   = 9
+nu    = 0.1
+m     = 9
 
 p     = dim(X)[2] 
 q     = dim(Y)[2]
@@ -419,9 +419,8 @@ obj_pen = function(pars)
   return(res_model$E2)
 }
 
-#obj_pen(theta_rand)
+obj_pen(theta_rand)
 res_opt = nlm(obj_pen,theta_rand, iterlim = 1000)
-
 ```
 Yes there are practical pitfalls if say for example our $y_ij$ i.e the observed classification is encoded as a zero, this could lead to multiple the logs with 0, therefore resulting in an error value of 0, which is not true.
 
@@ -454,7 +453,7 @@ for(i in 1:n_nus)
   res_opt    = nlm(obj_pen,theta_rand, iterlim = 1000)
 
   # Extract Validation Error:
-  res_val  = neural_net(X_val,Y_val,res_opt$estimate,m,0)
+  res_val  = neural_net(x_val,y_val,res_opt$estimate,m,0)
   E_val[i] = res_val$E1
    
   # Response Curve:
@@ -465,12 +464,28 @@ for(i in 1:n_nus)
  
 }
 
+plot(nu_seq, E_val, type="b", xlab="nu", ylab="validaton", main="Validation vs nu", col="red")
+
+optimal_nu = nu_seq[which.min(E_val)]
+
 ```
 
 
 ```{r}
+library(colorspace)
+color.gradient = function(x, colors=c('magenta','white','lightblue'), colsteps=50)
+{
+  colpal = colorRampPalette(colors)
+  return( colpal(colsteps)[ findInterval(x, seq(min(x),max(x), length=colsteps)) ] )
+}
+
+
+
 # Draw a response curve over the 2D input space to see
 # what pattern the neural network predicts
+cols = c('red','blue', "orange")
+plot(dat$X2~dat$X1,col = cols[dat$class] ,pch = 16)
+n = optimal_nu
 M  = 100
 x1 = seq(-4,4,length = M)
 x2 = seq(-4,4,length = M)
@@ -478,12 +493,12 @@ xx1 = rep(x1,M)
 xx2 = rep(x2,each = M)
 
 abline(v = x1,h= x2)
-points(xx2~xx1,pch = 16, col = 'purple',cex = 2)
+points(xx2~xx1,pch = 16, col = 'yellow',cex = 2)
 
 XX = cbind(xx1,xx2) 
-YY = matrix(1,M^2,1)
+YY = matrix(1,M^2,ncol=3)
 res_fitted = neural_net(XX,YY,res_opt$estimate,m,nu)
 
 plot(XX[,2]~XX[,1], pch = 16, col = color.gradient(res_fitted$A2),cex = 1/2)
-points(X[,2]~X[,1], col = cols[Y+1], pch = 16)
+points(X[,2]~X[,1], col = cols[dat$class], pch = 16)
 ```

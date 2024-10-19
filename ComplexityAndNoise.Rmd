@@ -305,8 +305,8 @@ library(tidyverse)
 dat = read.table("Collider_Data_2022.txt", h = TRUE, stringsAsFactors = TRUE)
 dim(dat)
 head(dat)
-X = dat[,1:2]
-Y = dat[,3:5]
+X = as.matrix(dat[,1:2])
+Y = as.matrix(dat[,3:5])
 non_one_hot = rep(0, nrow(X))
 
 for ( i in 1: length(non_one_hot)){
@@ -351,6 +351,7 @@ soft_max = function(z) {
 ```
 
 #c
+
 ```{r}
 
 sig1 = function(z)
@@ -382,15 +383,15 @@ neural_net = function(X, Y, theta,m,nu) {
    A1 = sig1(t(W1)%*%A0+b1%*%ones)
    A2 = soft_max(t(W2)%*%A1+b2%*%ones)
    
-   
+
    y_hat         = t(A2)
    error         = rep(0,N)
-   y_i_1         = which(Y==c(1,0,0)) # class 1
-   y_i_2         = which(Y==c(0,1,0)) # class 2
-   y_i_3         = which(Y==c(0,0,1)) # class 3
-   error[y_i_1]  = y_i_1%*%log(y_hat[y_i_1])
-   error[y_i_2]  = y_i_2%*%log(y_hat[y_i_2])
-   error[y_i_3]  = y_i_3%*%log(y_hat[y_i_3])
+   y_i_1         = which(apply(Y, 1, function(row) all(row == c(1, 0, 0))))
+   y_i_2         = which(apply(Y, 1, function(row) all(row == c(0, 1, 0))))
+   y_i_3         = which(apply(Y, 1, function(row) all(row == c(0, 0, 1))))
+   error[y_i_1]  = (Y[y_i_1,]*(log(y_hat[y_i_1,])))[,1]
+   error[y_i_2]  = (Y[y_i_2,]*(log(y_hat[y_i_2,])))[,2]
+   error[y_i_3]  = (Y[y_i_3,]*(log(y_hat[y_i_3,])))[,3]
    
    
    E1 = -1/N*error
@@ -400,6 +401,7 @@ neural_net = function(X, Y, theta,m,nu) {
    # sum
   
 }
+
 nu  = 0.1
 m   = 9
 
@@ -409,7 +411,79 @@ npars = p*m+m*q+m+q
 theta_rand = runif(npars,-1,1)
 
 res_model = neural_net(X,Y,theta_rand,m,nu)
-res_model
+
+
+obj_pen = function(pars)
+{
+  res_model = neural_net(X,Y,pars,m,nu)
+  return(res_model$E2)
+}
+
+#obj_pen(theta_rand)
+res_opt = nlm(obj_pen,theta_rand, iterlim = 1000)
+
 ```
 Yes there are practical pitfalls if say for example our $y_ij$ i.e the observed classification is encoded as a zero, this could lead to multiple the logs with 0, therefore resulting in an error value of 0, which is not true.
 
+Yes there are practical pitfalls when we have predictions that are zero, in our cases the one hot-encoded will always contain zero values, resulting in issues when computing the log of that value, to account for this we can add a small epsilon value
+
+#d
+
+```{r}
+set.seed(2022)
+
+train_indices = sample(1:nrow(X), size=nrow(X)*0.5,replace=FALSE)
+x_train       = X[train_indices,]
+y_train       = Y[train_indices,]
+x_val         = X[-train_indices,]
+y_val         = Y[-train_indices,]
+
+n_nus  = 10
+nu_seq = exp(seq(-5,0,length = n_nus))
+E_val  = rep(NA,n_nus)
+
+obj_pen = function(pars)
+{
+  res_model = neural_net(x_train,y_train,pars,m,nu)
+  return(res_model$E2)
+}
+
+for(i in 1:n_nus)
+{
+  nu         = nu_seq[i]
+  res_opt    = nlm(obj_pen,theta_rand, iterlim = 1000)
+
+  # Extract Validation Error:
+  res_val  = neural_net(X_val,Y_val,res_opt$estimate,m,0)
+  E_val[i] = res_val$E1
+   
+  # Response Curve:
+  #res_fitted = neural_net(XX,YY,res_opt$estimate,m,nu)
+  #plot(XX[,2]~XX[,1], pch = 16, col = color.gradient(res_fitted$A2),cex = 1/2,
+  #	main = substitute(nu==a,list(a = nu)))
+  #points(X[,2]~X[,1], col = cols[Y+1], pch = 16)
+ 
+}
+
+```
+
+
+```{r}
+# Draw a response curve over the 2D input space to see
+# what pattern the neural network predicts
+M  = 100
+x1 = seq(-4,4,length = M)
+x2 = seq(-4,4,length = M)
+xx1 = rep(x1,M)
+xx2 = rep(x2,each = M)
+
+abline(v = x1,h= x2)
+points(xx2~xx1,pch = 16, col = 'purple',cex = 2)
+
+XX = cbind(xx1,xx2) 
+YY = matrix(1,M^2,1)
+res_fitted = neural_net(XX,YY,res_opt$estimate,m,nu)
+
+plot(XX[,2]~XX[,1], pch = 16, col = color.gradient(res_fitted$A2),cex = 1/2)
+points(X[,2]~X[,1], col = cols[Y+1], pch = 16)
+```

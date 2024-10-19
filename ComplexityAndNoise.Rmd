@@ -88,6 +88,15 @@ Reviewing the above two figures, we observe that for the target functions genera
 ```{r}
 set.seed(2023)
 library(fields)
+
+
+# Function to normalize the target function
+#normalize = function(func) {
+#  mean_func = mean(func)
+#  sd_func = sd(func)
+#  return((func - mean_func) / sd_func)
+#}
+
 #simulates a dataset with target "func" of size n with noise sig
 generator=function(n,x,func,sig){
 	l<-length(func)
@@ -118,11 +127,13 @@ fdiff=function(x,target,model){
 
 
 x<-seq(-1,1,0.01);n=20;sig=0.5;q=10;
+func=rLegfunc(x,q)
+#func_normalized = normalize(func_1)  # Normalize the target function
 plot(c(min(x),max(x)),c(-4,4),main="10-th order target + noise",type="n",xlab="x",ylab=expression(f(x)))
-func=rLegfunc(x,t)
 lines(x,func,type="l",lwd=2)
 d<-generator(n,x,func,sig)
 points(d$xdat,d$ydat)
+
 
 
 model_H2  = lm(d$ydat~d$xdat+I(d$xdat^2))
@@ -161,21 +172,29 @@ for (i in 1:length(N_vals)) {
     # Generate data
     d = generator(n, x, func, sigma)
     
+    
     # Fit models
     model_H2  = lm(d$ydat~d$xdat+I(d$xdat^2))
     model_H10 = lm(d$ydat~d$xdat+I(d$xdat^2)+I(d$xdat^3)+I(d$xdat^4)+I(d$xdat^5)+I(d$xdat^6)+I(d$xdat^7)+I(d$xdat^8)+I(d$xdat^9)+I(d$xdat^10))
     
     # Calculate out-of-sample errors
-    Eout_H2 = fdiff(x,func,model_H2)+(sig^2)
+    Eout_H2  = fdiff(x,func,model_H2)+(sig^2)
     Eout_H10 = fdiff(x,func,model_H10)+(sig^2)
+
 
     # Store relative performance
     results[i, j] = Eout_H10 - Eout_H2
   }
 }
 
+normalize = function(x) {
+  return((x - mean(x)) / sd(x))
+}
+
+results_normalized = apply(results, 2, normalize)
+
 # Create a color map of the relative performance
-image.plot(N_vals, sigma_vals, results, xlab = "N", ylab = "sigma", main = "Relative Performance (H10 - H2)")
+image.plot(N_vals, sigma_vals, results_normalized, xlab = "N", ylab = "sigma", main = "Relative Performance (H10 - H2)")
 
 
 
@@ -218,7 +237,8 @@ for (i in 1:length(N_vals)) {
   }
 }
 
-image.plot(N_vals, Qf_vals, results, xlab = "N", ylab = "Qf", main = "Relative Performance (H10 - H2)")
+results_normalized = scale(results, center = TRUE, scale=TRUE)
+image.plot(N_vals, Qf_vals, results_normalized, xlab = "N", ylab = "Qf", main = "Relative Performance (H10 - H2)")
 
 ```
 
